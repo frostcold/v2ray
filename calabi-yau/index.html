@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>卡拉比–丘投影模型</title>
+<style>
+:root{--bg:#0b0d12;--panel:rgba(20,24,33,.92);--fg:#e6e9ef;--muted:#98a2b3;--accent:#7aa2ff;--line:#2a3140}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:13px/1.45 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#gl:active{cursor:grabbing}
+#panel{position:fixed;top:12px;right:12px;width:310px;max-height:calc(100% - 24px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;backdrop-filter:blur(8px)}
+#panel.hidden{display:none}
+h1{font-size:15px;margin:0 0 2px}
+.eq{font-family:"Cambria Math","STIX Two Math",serif;font-size:15px;color:var(--accent);margin:2px 0 8px}
+h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;border-top:1px solid var(--line);padding-top:10px}
+.row{display:grid;grid-template-columns:92px 1fr 46px;align-items:center;gap:8px;margin:5px 0}
+.row label{color:var(--muted)}
+.row output{text-align:right;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select,button{width:100%;background:#1c2230;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 6px;font:inherit}
+button{cursor:pointer}button:hover{border-color:var(--accent)}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin:6px 0}
+.checks label{display:flex;gap:6px;align-items:center;color:var(--fg)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.stats{color:var(--muted);font-size:12px;margin-top:8px}
+.note{color:var(--muted);font-size:12px}
+#toggle{position:fixed;top:12px;left:12px;width:auto;padding:6px 10px;z-index:2}
+#legend{position:fixed;left:12px;bottom:12px;color:var(--muted);font-size:12px;pointer-events:none}
+@media (max-width:640px){#panel{left:12px;right:12px;width:auto;top:auto;bottom:12px;max-height:55%}#legend{display:none}}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<button id="toggle">☰ 面板</button>
+<div id="panel">
+  <h1>卡拉比–丘流形投影</h1>
+  <div class="eq" id="eq">z₁⁵ + z₂⁵ = 1</div>
+  <div class="note">费马超曲面在 ℂ² 中的实二维切片，按 Hanson 方法由 n₁·n₂ 个补丁拼成，经 4D 旋转后投影到 3D。</div>
+
+  <h2>流形</h2>
+  <div class="row"><label>预设</label>
+    <select id="preset" style="grid-column:2/4">
+      <option value="5,5">五次 (n=5, 经典弦论)</option>
+      <option value="4,4">四次 (K3 切片)</option>
+      <option value="3,3">三次 (环面)</option>
+      <option value="2,2">二次</option>
+      <option value="3,5">混合 (3, 5)</option>
+      <option value="6,6">六次</option>
+      <option value="" selected>自定义</option>
+    </select></div>
+  <div class="row"><label>指数 n₁</label><input id="n1" type="range" min="2" max="10" step="1" value="5"><output></output></div>
+  <div class="row"><label>指数 n₂</label><input id="n2" type="range" min="2" max="10" step="1" value="5"><output></output></div>
+  <div class="row"><label>延展 a</label><input id="a" type="range" min="0.2" max="3" step="0.05" value="1.4"><output></output></div>
+  <div class="row"><label>分辨率</label><input id="res" type="range" min="6" max="64" step="1" value="28"><output></output></div>
+  <div class="row"><label>显示补丁</label><input id="vis" type="range" min="1" max="25" step="1" value="25"><output></output></div>
+
+  <h2>4D → 3D 投影</h2>
+  <div class="row"><label>投影角 α</label><input id="alpha" type="range" min="0" max="180" step="0.5" value="45"><output></output></div>
+  <div class="row"><label>z₁ 相位 φ₁</label><input id="phi1" type="range" min="0" max="360" step="1" value="0"><output></output></div>
+  <div class="row"><label>z₂ 相位 φ₂</label><input id="phi2" type="range" min="0" max="360" step="1" value="0"><output></output></div>
+  <div class="row"><label>补丁分离</label><input id="explode" type="range" min="0" max="1.5" step="0.01" value="0"><output></output></div>
+
+  <h2>外观</h2>
+  <div class="row"><label>着色</label>
+    <select id="mode" style="grid-column:2/4">
+      <option value="0">按补丁 (k₁, k₂)</option>
+      <option value="1">隐藏第四维坐标</option>
+      <option value="2">z₁ 的辐角</option>
+      <option value="3">参数网格棋盘</option>
+    </select></div>
+  <div class="checks">
+    <label><input id="surf" type="checkbox" checked>曲面</label>
+    <label><input id="wire" type="checkbox" checked>网格线</label>
+  </div>
+
+  <h2>动画</h2>
+  <div class="checks">
+    <label><input id="spin" type="checkbox" checked>自动旋转</label>
+    <label><input id="animA" type="checkbox">α 扫描</label>
+    <label><input id="animP" type="checkbox">相位流动</label>
+  </div>
+  <div class="row"><label>速度</label><input id="speed" type="range" min="0" max="3" step="0.05" value="1"><output></output></div>
+
+  <div class="btns">
+    <button id="reset">重置视角</button>
+    <button id="png">导出 PNG</button>
+  </div>
+  <div class="stats" id="stats"></div>
+</div>
+<div id="legend">拖动旋转 · 滚轮/双指缩放 · 双击重置</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const canvas = $("gl");
+const gl = canvas.getContext("webgl2", {antialias: true, preserveDrawingBuffer: true});
+if (!gl) { document.body.innerHTML = "<p style='padding:20px'>此浏览器不支持 WebGL2。</p>"; throw new Error("no webgl2"); }
+
+// ---------- shaders ----------
+const VS = `#version 300 es
+in vec4 aP; in vec4 aTu; in vec4 aTv; in vec4 aC; in vec4 aInfo;
+uniform mat4 uProj, uView;
+uniform float uAlpha, uPhi1, uPhi2, uExplode, uScale;
+out vec3 vN; out vec3 vPos; out float vW; out vec2 vZ1; out vec2 vUV;
+flat out float vPatch;
+// 4D 旋转 (z1、z2 各自相位) + 将 (Im z1, Im z2) 平面旋转 α，保留前三个分量
+vec4 rot(vec4 p){
+  float c1=cos(uPhi1), s1=sin(uPhi1), c2=cos(uPhi2), s2=sin(uPhi2);
+  vec2 a=vec2(c1*p.x-s1*p.y, s1*p.x+c1*p.y);
+  vec2 b=vec2(c2*p.z-s2*p.w, s2*p.z+c2*p.w);
+  float ca=cos(uAlpha), sa=sin(uAlpha);
+  return vec4(a.x, b.x, ca*a.y+sa*b.y, -sa*a.y+ca*b.y);
+}
+void main(){
+  vec4 q=rot(aP);
+  vec3 pos=(q.xyz + uExplode*rot(aC).xyz)*uScale;
+  vec3 n=cross(rot(aTu).xyz, rot(aTv).xyz);
+  vec4 vp=uView*vec4(pos,1.0);
+  vPos=vp.xyz; vN=mat3(uView)*n; vW=q.w*uScale;
+  vZ1=aP.xy; vUV=aInfo.zw; vPatch=aInfo.x;
+  gl_Position=uProj*vp;
+}`;
+const FS = `#version 300 es
+precision highp float;
+in vec3 vN; in vec3 vPos; in float vW; in vec2 vZ1; in vec2 vUV;
+flat in float vPatch;
+uniform int uMode, uLine; uniform float uVisible, uPatches; uniform vec4 uLineCol;
+out vec4 o;
+vec3 hue(float h){ vec3 k=clamp(abs(mod(h*6.0+vec3(0,4,2),6.0)-3.0)-1.0,0.0,1.0); return k; }
+vec3 pal(float h){ return mix(vec3(0.55), hue(h), 0.62)*0.95; }
+void main(){
+  if(vPatch > uVisible-0.5) discard;
+  if(uLine==1){ o=uLineCol; return; }
+  vec3 base;
+  if(uMode==0) base=pal(vPatch/uPatches);
+  else if(uMode==1){ float t=tanh(vW*2.2);
+    base = t<0.0 ? mix(vec3(0.82),vec3(0.20,0.42,0.90),-t) : mix(vec3(0.82),vec3(0.92,0.45,0.18),t); }
+  else if(uMode==2) base=pal(atan(vZ1.y,vZ1.x)/6.2831853+0.5);
+  else { float c=mod(floor(vUV.x*10.0)+floor(vUV.y*10.0),2.0); base=pal(vPatch/uPatches)*(0.62+0.38*c); }
+  vec3 n=normalize(vN + 1e-9); vec3 v=normalize(-vPos);
+  if(dot(n,v)<0.0) n=-n;
+  vec3 L1=normalize(vec3(0.5,0.75,0.6)), L2=normalize(vec3(-0.7,-0.2,0.4));
+  float d1=max(dot(n,L1),0.0), d2=max(dot(n,L2),0.0);
+  float sp=pow(max(dot(n,normalize(L1+v)),0.0),48.0);
+  float rim=pow(1.0-max(dot(n,v),0.0),3.0);
+  vec3 c=base*(0.20+0.78*d1+0.28*d2)+0.32*sp+0.22*rim*vec3(0.6,0.72,1.0);
+  o=vec4(pow(c,vec3(0.92)),1.0);
+}`;
+function compile(type, src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+const prog=gl.createProgram();
+gl.attachShader(prog,compile(gl.VERTEX_SHADER,VS)); gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,FS));
+gl.linkProgram(prog); if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+const U={}; for(const n of ["uProj","uView","uAlpha","uPhi1","uPhi2","uExplode","uScale","uMode","uLine","uVisible","uPatches","uLineCol"]) U[n]=gl.getUniformLocation(prog,n);
+
+// ---------- geometry: z1^n1 + z2^n2 = 1 ----------
+// z1 = e^{2πi k1/n1} cos(ξ)^{2/n1},  z2 = e^{2πi k2/n2} sin(ξ)^{2/n2},  ξ = x + iy,  x∈[0,π/2], y∈[-a,a]
+function cpow(re, im, p){ const r=Math.hypot(re,im); if(r<1e-14) return [0,0];
+  const t=Math.atan2(im,re)*p, R=Math.pow(r,p); return [R*Math.cos(t), R*Math.sin(t)]; }
+
+const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+const bufs={}; ["aP","aTu","aTv","aC","aInfo"].forEach(name=>{
+  const b=gl.createBuffer(), loc=gl.getAttribLocation(prog,name);
+  gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,4,gl.FLOAT,false,0,0); bufs[name]=b; });
+const triBuf=gl.createBuffer(), lineBuf=gl.createBuffer();
+let triCount=0, lineCount=0, fitScale=1, patches=25;
+
+function build(n1, n2, a, N){
+  const W=N+1, V=W*W; patches=n1*n2;
+  // 基础补丁 (k1=k2=0)
+  const B=new Float64Array(V*4);
+  for(let j=0;j<W;j++) for(let i=0;i<W;i++){
+    const x=Math.PI/2*i/N, y=-a+2*a*j/N, ch=Math.cosh(y), sh=Math.sinh(y), cx=Math.cos(x), sx=Math.sin(x);
+    const z1=cpow(cx*ch, -sx*sh, 2/n1), z2=cpow(sx*ch, cx*sh, 2/n2), k=(j*W+i)*4;
+    B[k]=z1[0]; B[k+1]=z1[1]; B[k+2]=z2[0]; B[k+3]=z2[1];
+  }
+  const Tu=new Float64Array(V*4), Tv=new Float64Array(V*4), cen=[0,0,0,0];
+  let maxR=0;
+  for(let j=0;j<W;j++) for(let i=0;i<W;i++){
+    const k=(j*W+i)*4, iu0=Math.max(i-1,0), iu1=Math.min(i+1,N), jv0=Math.max(j-1,0), jv1=Math.min(j+1,N);
+    for(let c=0;c<4;c++){
+      Tu[k+c]=B[(j*W+iu1)*4+c]-B[(j*W+iu0)*4+c];
+      Tv[k+c]=B[(jv1*W+i)*4+c]-B[(jv0*W+i)*4+c];
+      cen[c]+=B[k+c]/V;
+    }
+    maxR=Math.max(maxR, Math.hypot(B[k],B[k+1],B[k+2],B[k+3]));
+  }
+  fitScale=1/maxR;
+  const P=new Float32Array(patches*V*4), TU=new Float32Array(patches*V*4), TV=new Float32Array(patches*V*4),
+        C=new Float32Array(patches*V*4), I=new Float32Array(patches*V*4);
+  // 乘以单位根: 线性变换，切向量同样旋转
+  const mul=(src,o,r1,r2,dst,d)=>{ dst[d]=src[o]*r1[0]-src[o+1]*r1[1]; dst[d+1]=src[o]*r1[1]+src[o+1]*r1[0];
+    dst[d+2]=src[o+2]*r2[0]-src[o+3]*r2[1]; dst[d+3]=src[o+2]*r2[1]+src[o+3]*r2[0]; };
+  for(let k1=0;k1<n1;k1++) for(let k2=0;k2<n2;k2++){
+    const p=k1*n2+k2, r1=[Math.cos(2*Math.PI*k1/n1),Math.sin(2*Math.PI*k1/n1)], r2=[Math.cos(2*Math.PI*k2/n2),Math.sin(2*Math.PI*k2/n2)];
+    const cc=new Float32Array(4); mul(cen,0,r1,r2,cc,0);
+    for(let v=0;v<V;v++){
+      const d=(p*V+v)*4, s=v*4;
+      mul(B,s,r1,r2,P,d); mul(Tu,s,r1,r2,TU,d); mul(Tv,s,r1,r2,TV,d);
+      C.set(cc,d); I[d]=p; I[d+2]=(v%W)/N; I[d+3]=Math.floor(v/W)/N;
+    }
+  }
+  const up=(name,data)=>{ gl.bindBuffer(gl.ARRAY_BUFFER,bufs[name]); gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW); };
+  up("aP",P); up("aTu",TU); up("aTv",TV); up("aC",C); up("aInfo",I);
+
+  const tri=new Uint32Array(patches*N*N*6); let t=0;
+  const stride=Math.max(1,Math.round(N/14)), gl_=[];
+  for(let p=0;p<patches;p++){
+    const o=p*V;
+    for(let j=0;j<N;j++) for(let i=0;i<N;i++){
+      const a0=o+j*W+i, b0=a0+1, c0=a0+W, d0=c0+1;
+      tri[t++]=a0; tri[t++]=b0; tri[t++]=c0; tri[t++]=b0; tri[t++]=d0; tri[t++]=c0;
+    }
+    for(let j=0;j<=N;j++) if(j%stride===0||j===N) for(let i=0;i<N;i++) gl_.push(o+j*W+i,o+j*W+i+1);
+    for(let i=0;i<=N;i++) if(i%stride===0||i===N) for(let j=0;j<N;j++) gl_.push(o+j*W+i,o+(j+1)*W+i);
+  }
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triBuf); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,tri,gl.STATIC_DRAW); triCount=t;
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,lineBuf); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint32Array(gl_),gl.STATIC_DRAW); lineCount=gl_.length;
+}
+
+// ---------- matrices (column-major) ----------
+function persp(fov,asp,n,f){ const t=1/Math.tan(fov/2); return [t/asp,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0]; }
+function mul4(a,b){ const r=new Array(16); for(let c=0;c<4;c++) for(let rI=0;rI<4;rI++){ let s=0; for(let k=0;k<4;k++) s+=a[k*4+rI]*b[c*4+k]; r[c*4+rI]=s; } return r; }
+const rx=t=>[1,0,0,0, 0,Math.cos(t),Math.sin(t),0, 0,-Math.sin(t),Math.cos(t),0, 0,0,0,1];
+const ry=t=>[Math.cos(t),0,-Math.sin(t),0, 0,1,0,0, Math.sin(t),0,Math.cos(t),0, 0,0,0,1];
+const tr=(x,y,z)=>[1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1];
+
+// ---------- UI ----------
+const S={}; const ctrls=["n1","n2","a","res","vis","alpha","phi1","phi2","explode","speed"];
+const fmt={alpha:v=>v.toFixed(0)+"°",phi1:v=>v.toFixed(0)+"°",phi2:v=>v.toFixed(0)+"°",a:v=>v.toFixed(2),explode:v=>v.toFixed(2),speed:v=>v.toFixed(2)+"×"};
+const sup=n=>String(n).split("").map(d=>"⁰¹²³⁴⁵⁶⁷⁸⁹"[d]).join("");
+let dirty=true;
+function read(id){ const el=$(id); S[id]=parseFloat(el.value); el.nextElementSibling.value=(fmt[id]||String)(S[id]); }
+function updateStats(){
+  $("eq").textContent=`z₁${sup(S.n1)} + z₂${sup(S.n2)} = 1`;
+  $("stats").textContent=`补丁 ${Math.min(S.vis,patches)}/${patches} · 三角形 ${(triCount/3).toLocaleString()} · 顶点 ${(patches*(S.res+1)**2).toLocaleString()}`;
+}
+function syncVisMax(){ const v=$("vis"), max=S.n1*S.n2, full=+v.value>=+v.max; v.max=max; if(full||+v.value>max) v.value=max; read("vis"); }
+ctrls.forEach(id=>{ read(id); $(id).addEventListener("input",()=>{
+  read(id);
+  if(id==="n1"||id==="n2"){ $("preset").value=""; syncVisMax(); }
+  if(["n1","n2","a","res"].includes(id)) dirty=true;
+  updateStats();
+}); });
+$("preset").addEventListener("change",e=>{ if(!e.target.value) return; const [a,b]=e.target.value.split(",");
+  $("n1").value=a; $("n2").value=b; read("n1"); read("n2"); $("vis").value=99; syncVisMax(); dirty=true; updateStats(); });
+$("preset").value="5,5";
+$("toggle").onclick=()=>$("panel").classList.toggle("hidden");
+
+let yaw=0.6, pitch=0.35, dist=3.2;
+function resetView(){ yaw=0.6; pitch=0.35; dist=3.2; }
+$("reset").onclick=resetView;
+canvas.addEventListener("dblclick",resetView);
+$("png").onclick=()=>{ const l=document.createElement("a"); l.download=`calabi-yau-${S.n1}-${S.n2}.png`; l.href=canvas.toDataURL("image/png"); l.click(); };
+
+const ptrs=new Map(); let pinch0=0;
+canvas.addEventListener("pointerdown",e=>{ canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); });
+canvas.addEventListener("pointermove",e=>{
+  if(!ptrs.has(e.pointerId)) return; const p=ptrs.get(e.pointerId);
+  if(ptrs.size===1){ yaw+=(e.clientX-p.x)*0.008; pitch=Math.max(-1.5,Math.min(1.5,pitch+(e.clientY-p.y)*0.008)); }
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){ const [a,b]=[...ptrs.values()], d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(pinch0) dist=Math.max(1.2,Math.min(12,dist*pinch0/d)); pinch0=d; }
+});
+const up=e=>{ ptrs.delete(e.pointerId); pinch0=0; };
+canvas.addEventListener("pointerup",up); canvas.addEventListener("pointercancel",up);
+canvas.addEventListener("wheel",e=>{ e.preventDefault(); dist=Math.max(1.2,Math.min(12,dist*Math.exp(e.deltaY*0.001))); },{passive:false});
+
+// ---------- render loop ----------
+gl.enable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(dirty){ build(S.n1,S.n2,S.a,S.res); dirty=false; syncVisMax(); updateStats(); }
+  const sp=S.speed;
+  if($("spin").checked) yaw+=dt*0.25*sp;
+  if($("animA").checked){ const el=$("alpha"); el.value=((+el.value+dt*20*sp)%180).toFixed(1); read("alpha"); }
+  if($("animP").checked){ const a=$("phi1"), b=$("phi2");
+    a.value=((+a.value+dt*24*sp)%360).toFixed(0); b.value=((+b.value-dt*24*sp+360)%360).toFixed(0); read("phi1"); read("phi2"); }
+
+  const dpr=Math.min(window.devicePixelRatio||1,2), w=Math.round(canvas.clientWidth*dpr), h=Math.round(canvas.clientHeight*dpr);
+  if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; }
+  gl.viewport(0,0,w,h); gl.clearColor(0.043,0.051,0.071,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+  const view=mul4(tr(0,0,-dist),mul4(rx(pitch),mul4(ry(yaw),rx(-Math.PI/2))));
+  gl.uniformMatrix4fv(U.uProj,false,persp(0.75,w/h,0.05,100));
+  gl.uniformMatrix4fv(U.uView,false,view);
+  const D=Math.PI/180;
+  gl.uniform1f(U.uAlpha,S.alpha*D); gl.uniform1f(U.uPhi1,S.phi1*D); gl.uniform1f(U.uPhi2,S.phi2*D);
+  gl.uniform1f(U.uExplode,S.explode); gl.uniform1f(U.uScale,fitScale/(1+0.6*S.explode));
+  gl.uniform1i(U.uMode,+$("mode").value); gl.uniform1f(U.uVisible,S.vis); gl.uniform1f(U.uPatches,patches);
+
+  if($("surf").checked){
+    gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1,1);
+    gl.uniform1i(U.uLine,0); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triBuf); gl.drawElements(gl.TRIANGLES,triCount,gl.UNSIGNED_INT,0);
+    gl.disable(gl.POLYGON_OFFSET_FILL);
+  }
+  if($("wire").checked){
+    gl.uniform4fv(U.uLineCol,$("surf").checked?[0.04,0.05,0.08,0.55]:[0.55,0.68,1.0,0.7]); gl.uniform1i(U.uLine,1); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,lineBuf); gl.drawElements(gl.LINES,lineCount,gl.UNSIGNED_INT,0);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
