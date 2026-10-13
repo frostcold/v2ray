@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>卡拉比–丘投影模型</title>
+<meta name="description" content="可调参数的卡拉比–丘流形 4D→3D 投影交互模型，单文件 WebGL，手机可玩。">
+<meta name="theme-color" content="#0b0d12">
 <style>
 :root{--bg:#0b0d12;--panel:rgba(20,24,33,.92);--fg:#e6e9ef;--muted:#98a2b3;--accent:#7aa2ff;--line:#2a3140}
 *{box-sizing:border-box}
@@ -86,6 +88,7 @@ button{cursor:pointer}button:hover{border-color:var(--accent)}
   <div class="btns">
     <button id="reset">重置视角</button>
     <button id="png">导出 PNG</button>
+    <button id="xhs" style="grid-column:1/3">导出小红书图 (3:4 · 1080×1440)</button>
   </div>
   <div class="stats" id="stats"></div>
 </div>
@@ -248,13 +251,17 @@ ctrls.forEach(id=>{ read(id); $(id).addEventListener("input",()=>{
 $("preset").addEventListener("change",e=>{ if(!e.target.value) return; const [a,b]=e.target.value.split(",");
   $("n1").value=a; $("n2").value=b; read("n1"); read("n2"); $("vis").value=99; syncVisMax(); dirty=true; updateStats(); });
 $("preset").value="5,5";
+if(matchMedia("(max-width:640px)").matches) $("panel").classList.add("hidden");
 $("toggle").onclick=()=>$("panel").classList.toggle("hidden");
 
 let yaw=0.6, pitch=0.35, dist=3.2;
 function resetView(){ yaw=0.6; pitch=0.35; dist=3.2; }
 $("reset").onclick=resetView;
 canvas.addEventListener("dblclick",resetView);
-$("png").onclick=()=>{ const l=document.createElement("a"); l.download=`calabi-yau-${S.n1}-${S.n2}.png`; l.href=canvas.toDataURL("image/png"); l.click(); };
+const save=(url,name)=>{ const l=document.createElement("a"); l.download=name; l.href=url; l.click(); };
+$("png").onclick=()=>save(canvas.toDataURL("image/png"),`calabi-yau-${S.n1}-${S.n2}.png`);
+let exportSize=null;
+$("xhs").onclick=()=>{ exportSize=[1080,1440]; };
 
 const ptrs=new Map(); let pinch0=0;
 canvas.addEventListener("pointerdown",e=>{ canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); });
@@ -281,12 +288,14 @@ function frame(now){
   if($("animP").checked){ const a=$("phi1"), b=$("phi2");
     a.value=((+a.value+dt*24*sp)%360).toFixed(0); b.value=((+b.value-dt*24*sp+360)%360).toFixed(0); read("phi1"); read("phi2"); }
 
-  const dpr=Math.min(window.devicePixelRatio||1,2), w=Math.round(canvas.clientWidth*dpr), h=Math.round(canvas.clientHeight*dpr);
+  const dpr=Math.min(window.devicePixelRatio||1,2), ex=exportSize;
+  const w=ex?ex[0]:Math.round(canvas.clientWidth*dpr), h=ex?ex[1]:Math.round(canvas.clientHeight*dpr);
   if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; }
   gl.viewport(0,0,w,h); gl.clearColor(0.043,0.051,0.071,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
   const view=mul4(tr(0,0,-dist),mul4(rx(pitch),mul4(ry(yaw),rx(-Math.PI/2))));
-  gl.uniformMatrix4fv(U.uProj,false,persp(0.75,w/h,0.05,100));
+  const asp=w/h, fovY=2*Math.atan(Math.tan(0.375)/Math.min(asp,1)); // 竖屏时保证横向也能完整显示
+  gl.uniformMatrix4fv(U.uProj,false,persp(fovY,asp,0.05,100));
   gl.uniformMatrix4fv(U.uView,false,view);
   const D=Math.PI/180;
   gl.uniform1f(U.uAlpha,S.alpha*D); gl.uniform1f(U.uPhi1,S.phi1*D); gl.uniform1f(U.uPhi2,S.phi2*D);
@@ -301,6 +310,7 @@ function frame(now){
   if($("wire").checked){
     gl.uniform4fv(U.uLineCol,$("surf").checked?[0.04,0.05,0.08,0.55]:[0.55,0.68,1.0,0.7]); gl.uniform1i(U.uLine,1); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,lineBuf); gl.drawElements(gl.LINES,lineCount,gl.UNSIGNED_INT,0);
   }
+  if(ex){ save(canvas.toDataURL("image/png"),`calabi-yau-xhs-${S.n1}-${S.n2}.png`); exportSize=null; }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
