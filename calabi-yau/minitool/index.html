@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>卡拉比–丘投影模型</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <canvas id="gl"></canvas>
+
+  <div id="fallback" class="fallback hidden">
+    <img src="./fallback.webp" alt="卡拉比–丘流形静态预览" />
+    <p id="fallbackMsg">当前设备无法运行 3D 渲染，已显示静态预览。</p>
+  </div>
+
+  <button id="toggle" class="toggle touchable" type="button">☰ 参数</button>
+
+  <div id="panel" class="panel">
+    <h1>卡拉比–丘流形投影</h1>
+    <div class="eq" id="eq">z₁⁵ + z₂⁵ = 1</div>
+    <p class="note">费马超曲面在 ℂ² 中的实二维切片，按 Hanson 方法由 n₁·n₂ 个补丁拼成，经 4D 旋转后投影到 3D。</p>
+
+    <h2>流形</h2>
+    <div class="row"><label for="preset">预设</label>
+      <select id="preset" class="wide">
+        <option value="5,5">五次 (n=5, 经典弦论)</option>
+        <option value="4,4">四次 (K3 切片)</option>
+        <option value="3,3">三次 (环面)</option>
+        <option value="2,2">二次</option>
+        <option value="3,5">混合 (3, 5)</option>
+        <option value="6,6">六次</option>
+        <option value="">自定义</option>
+      </select></div>
+    <div class="row"><label for="n1">指数 n₁</label><input id="n1" type="range" min="2" max="10" step="1" value="5"><output></output></div>
+    <div class="row"><label for="n2">指数 n₂</label><input id="n2" type="range" min="2" max="10" step="1" value="5"><output></output></div>
+    <div class="row"><label for="a">延展 a</label><input id="a" type="range" min="0.2" max="3" step="0.05" value="1.4"><output></output></div>
+    <div class="row"><label for="res">分辨率</label><input id="res" type="range" min="6" max="64" step="1" value="28"><output></output></div>
+    <div class="row"><label for="vis">显示补丁</label><input id="vis" type="range" min="1" max="25" step="1" value="25"><output></output></div>
+
+    <h2>4D → 3D 投影</h2>
+    <div class="row"><label for="alpha">投影角 α</label><input id="alpha" type="range" min="0" max="180" step="0.5" value="45"><output></output></div>
+    <div class="row"><label for="phi1">z₁ 相位 φ₁</label><input id="phi1" type="range" min="0" max="360" step="1" value="0"><output></output></div>
+    <div class="row"><label for="phi2">z₂ 相位 φ₂</label><input id="phi2" type="range" min="0" max="360" step="1" value="0"><output></output></div>
+    <div class="row"><label for="explode">补丁分离</label><input id="explode" type="range" min="0" max="1.5" step="0.01" value="0"><output></output></div>
+
+    <h2>外观</h2>
+    <div class="row"><label for="mode">着色</label>
+      <select id="mode" class="wide">
+        <option value="0">按补丁 (k₁, k₂)</option>
+        <option value="1">隐藏第四维坐标</option>
+        <option value="2">z₁ 的辐角</option>
+        <option value="3">参数网格棋盘</option>
+      </select></div>
+    <div class="checks">
+      <label><input id="surf" type="checkbox" checked>曲面</label>
+      <label><input id="wire" type="checkbox" checked>网格线</label>
+    </div>
+
+    <h2>动画</h2>
+    <div class="checks">
+      <label><input id="spin" type="checkbox" checked>自动旋转</label>
+      <label><input id="animA" type="checkbox">α 扫描</label>
+      <label><input id="animP" type="checkbox">相位流动</label>
+    </div>
+    <div class="row"><label for="speed">速度</label><input id="speed" type="range" min="0" max="3" step="0.05" value="1"><output></output></div>
+
+    <div class="btns">
+      <button id="reset" class="touchable" type="button">重置视角</button>
+      <button id="save" class="touchable" type="button">保存到相册</button>
+      <button id="post" class="touchable primary full" type="button">一键发布笔记 (3:4 图)</button>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div id="legend" class="legend">拖动旋转 · 双指缩放 · 双击重置</div>
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="preview" class="modal hidden">
+    <div class="modal-box">
+      <img id="previewImg" alt="导出预览" />
+      <p id="previewMsg"></p>
+      <button id="previewClose" class="touchable" type="button">关闭</button>
+    </div>
+  </div>
+
+  <script src="./main.js"></script>
+</body>
+</html>

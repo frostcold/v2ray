@@ -35,3 +35,15 @@ x ∈ [0, π/2],  y ∈ [-a, a],  k₁ < n₁,  k₂ < n₂
 | 动画 | 自动旋转、α 扫描、相位流动 |
 
 投影在顶点着色器中完成，法线由 4D 切向量投影后叉乘得到，所以调节投影参数时不需要在 CPU 上重建网格。
+
+## 小红书小工具版（`minitool/`）
+
+按 minitool-zip-builder 规范改写，打包产物为 `calabi-yau-minitool.zip`（`index.html` 位于 zip 根目录）：
+
+- 脚本外置为经典脚本 `main.js`（ES2017），无内联脚本 / 行内事件 / 外部资源
+- WebGL 1 渲染；DPR ≤ 1.5、像素 ≤ 200 万、三角形 ≤ 10 万，持续掉帧自动降为省电档（DPR 1、5 万三角形），再不行则暂停动画
+- 页面隐藏时暂停渲染；处理 `webglcontextlost` / `restored`；无 WebGL 时显示 `fallback.webp` 静态预览
+- 下载改为容器能力：`writeTempFile` → `saveImageToPhotosAlbum`（保存相册）/ `postNote`（发布笔记），非容器环境显示预览提示
+- CSS 以 Chrome 61 为基线，毛玻璃通过 `@supports` 增强，安全区使用 `var(--safe-area-inset-*, env(...))`
+
+重新打包：`cd calabi-yau/minitool && zip -r -X ../calabi-yau-minitool.zip . -x '*.DS_Store'`
